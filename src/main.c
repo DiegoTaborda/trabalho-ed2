@@ -16,11 +16,19 @@ void inicializarMetadados(const char *caminho, Metadados *cabecalho);
 void arquivaBlocosMinerados(int n, BlocoMinerado *bM, const char *caminho);
 void attMetadados(const char *caminho, int n, Metadados *cabecalho);
 BlocoMinerado *procuraUltimoBloco(const char *caminho, int n);
+void preencheCarteiras(MTRand *r, unsigned int *Carteira);
+void transacoes(MTRand *r, unsigned int *Carteira, int nTrans);
+arvore* insereNo(arvore **raiz, int chave);
+arvore* criaNo(int chave);
+void printArvore(arvore *raiz);
+void montaArvore(unsigned int *Carteira, arvore **raiz, int tam);
+void printMaior(arvore *raiz);
 
 int main(int argc, char *argv[])
 {
 
   MTRand r = seedRand(SEED);
+  preencheCarteiras(&r, &Carteira);
 
   const char *arquivo = "./blockchain.bin";
   Metadados *cabecalho = (Metadados *)malloc(sizeof(Metadados));
@@ -30,13 +38,16 @@ int main(int argc, char *argv[])
   BlocoNaoMinerado *bNM = NULL;
   BlocoMinerado *bMAtual = NULL;
   BlocoMinerado *bMAnterior = NULL;
-
+  arvore *raiz = NULL;
+  unsigned int Carteira[MAX_ENDERECOS];
+  int a = -1;
   int n = 0;
+
   if (cabecalho->quantidade == 0)
   {
     // Bloco Genesis
     bNM = alocaBlocoNaoMinerado();
-    initBloco(bNM, NULL, &r);
+    initBloco(bNM, NULL, &r, &Carteira);
 
     bMAtual = minerarBloco(bNM);
     bMAnterior = bMAtual;
@@ -47,32 +58,74 @@ int main(int argc, char *argv[])
   {
     bMAnterior = procuraUltimoBloco(arquivo, cabecalho->quantidade);
   }
+    // NoLista *raiz = NULL;
+    // addBlocoMinerado(genMinerado, &raiz);
 
-  // NoLista *raiz = NULL;
-  // addBlocoMinerado(genMinerado, &raiz);
-
-  int minerar = 1;
-  while (minerar)
+  while(a != 0)
   {
-    // Aloca um novo
-    bNM = alocaBlocoNaoMinerado();
-    // Inicializa
-    initBloco(bNM, bMAnterior, &r);
-    // Minera
-    bMAtual = minerarBloco(bNM);
-    n += 1;
-    blocos[n - 1] = *bMAtual;
-    if (n == 2)
-    {
-      arquivaBlocosMinerados(n, blocos, arquivo);
-      attMetadados(arquivo, n, cabecalho);
-      n = 0;
-    }
-    // Adiciona o bloco minerado na blockchain
-    // addBlocoMinerado(bMAtual, &raiz);
-    bMAnterior = bMAtual;
-  }
+    printf("Digite o numero referente a operação que deseja realizar\n");
+    printf("1-Pesquisar hash de um bloco\n");
+    scanf("%d"&a);
+    printf("2-Pesquisar Carteira\n");
+    scanf("%d"&a);
+    printf("3-Buscar carteira com mais BitCoins\n");
+    scanf("%d"&a);
+    printf("4-Listar Carteiras e suas quantias de BitCoin(s)\n");
+    scanf("%d"&a);
+    printf("5-Minerar Bloco\n");
+    scanf("%d"&a);
+    printf("0-Sair\n");
+    scanf("%d"&a);
 
+    switch(a)
+    {
+      case 1:
+        //Fazer a busca do hash de um bloco
+        break;
+      
+      case 2:
+        printf("Digite o endereco da Carteira que deseja pesquisar\n");
+        int end;
+        scanf("%d"&end);
+        printf("A Carteira %d tem %u BitCoin(s)\n",end, Carteira[end]);
+        break;
+      
+      case 3:
+        montaArvore(&Carteira, &raiz, MAX_ENDERECOS);
+        printMaior(raiz);
+        break;
+      
+      case 4:
+        montaArvore(&Carteira, &raiz, MAX_ENDERECOS);
+        printf("Endereco   -   Bitcoin(s)\n");
+        printArvore(arvore *raiz);
+        break;
+      
+      case 5:
+        int minerar = 1;
+        while (minerar)
+        {
+          // Aloca um novo
+          bNM = alocaBlocoNaoMinerado();
+          // Inicializa
+          initBloco(bNM, bMAnterior, &r, &Carteira);
+          // Minera
+          bMAtual = minerarBloco(bNM);
+          n += 1;
+          blocos[n - 1] = *bMAtual;
+          if (n == 2)
+          {
+            arquivaBlocosMinerados(n, blocos, arquivo);
+            attMetadados(arquivo, n, cabecalho);
+            n = 0;
+          }
+          // Adiciona o bloco minerado na blockchain
+          // addBlocoMinerado(bMAtual, &raiz);
+          bMAnterior = bMAtual;
+        }
+        break;
+    }
+  }
   return 0;
 }
 
@@ -259,7 +312,7 @@ BlocoNaoMinerado *alocaBlocoNaoMinerado()
   return aux;
 }
 
-void initBloco(BlocoNaoMinerado *bNM, BlocoMinerado *bAnt, MTRand *r)
+void initBloco(BlocoNaoMinerado *bNM, BlocoMinerado *bAnt, MTRand *r, unsigned int *Carteira)
 {
 
   int i = 0;
@@ -290,12 +343,90 @@ void initBloco(BlocoNaoMinerado *bNM, BlocoMinerado *bAnt, MTRand *r)
 
   // Gerando o número de transações
   unsigned int nTrans = getRandInt(r, 0, MAX_TRANSACOES);
-  i = 0;
-  // Gerando os valores das transações
-  // !! Criar uma função para realizar as transações
-  // !! Otimizar o algoritmo para as transações
 
-  do
+  transacoes(r, Carteira, nTrans);
+}
+
+void preencheCarteiras(MTRand *r, unsigned int *Carteira) 
+{
+  int i = 0;
+  while (i < MAX_ENDERECOS)
+  {
+    Carteira[i] = getRandInt(r, 0, MAX_BITCOINS_TRANSACAO);
+    i++;
+  }
+}
+
+void transacoes(MTRand *r, unsigned int *Carteira, int nTrans)
+{
+  for(int i=0; i < nTrans; i++)
+  {
+    short int origem = getRandInt(r, 0, 255);
+    short int destino = getRandInt(r, 0, 255);
+
+    if(origem == destino)
+      {
+        nTrans++;
+        continue;
+      }
+
+    short int btc = getRandInt(r, 0, MAX_BITCOINS_TRANSACAO);
+    
+    if(btc > Carteira[origem])
+      Carteira[origem] = 0;
+    else
+      Carteira[origem] -= btc;
+
+    Carteira[destino] += btc;
+  }
+}
+
+arvore* insereNo(arvore **raiz,unsigned int btc, int endereco) 
+{
+
+  if((*raiz) == NULL) 
+      return *raiz = criaNo(btc); 
+
+  if(btc < (*raiz)->btc)
+    (*raiz)->esq = insereNo( &((*raiz)->esq), btc, endereco);
+
+  else
+    (*raiz)->dir = insereNo( &((*raiz)->dir), btc, endereco);    
+}
+
+arvore* criaNo(unsigned int btc, int endereco) {
+
+    arvore* no;
+    
+    no = (arvore *) malloc(sizeof(arvore));
+    no->btc = btc;
+    no->endereco = endereco;
+    no->esq = NULL;
+    no->dir = NULL;
+    return no;
+}
+
+void printArvore(arvore *raiz) {
+  if (raiz==NULL) return;
+  printArvore(raiz->esq);
+  printf("%d   -   %u\n", raiz->endereco, raiz->btc);
+  printArvore(raiz->dir);
+}
+
+void montaArvore(unsigned int *Carteira, arvore **raiz, int tam)
+{
+  for(int i=0; i < tam; i++)
+    insereNo(raiz,Carteira[i],i);
+}
+
+void printMaior(arvore *raiz) {
+  if (raiz==NULL) return;
+  if (raiz->dir == NULL)
+    printf("A Carteira com maior valor eh a %d com um total de %u BitCoin(s)\n", raiz->endereco, raiz->btc);
+  printArvore(raiz->dir);
+}
+
+/*do
   {
     // Endereço de origem
     unsigned int origem = getRandInt(r, 0, MAX_ENDERECOS);
@@ -308,16 +439,13 @@ void initBloco(BlocoNaoMinerado *bNM, BlocoMinerado *bAnt, MTRand *r)
     bNM->data[i + 1] = (unsigned char)destino;
     bNM->data[i + 2] = (unsigned char)nBitcoins;
     i += 3;
-  } while (i <= nTrans);
-}
+  } while (i <= nTrans);*/
 
 /*void addBlocoMinerado(BlocoMinerado *bM, NoLista **raiz)
 {
-
   NoLista *aux = (NoLista *)malloc(sizeof(NoLista));
   aux->bM = bM;
   aux->prox = NULL;
-
   if (*raiz == NULL)
   {
     *raiz = aux;
@@ -326,19 +454,16 @@ void initBloco(BlocoNaoMinerado *bNM, BlocoMinerado *bAnt, MTRand *r)
   aux->prox = (*raiz)->prox;
   (*raiz)->prox = aux;
 }
+
 void transacoes(MTRand *r, EnderecoAVL **end, BitCoinAVL **btc)
 {
-
   // for (int i = getRandInt(r, 0, 61); i > 0; i--)
   // {
   //   unsigned int origem, destino;
-
   //   origem = getRandInt(r, 0, MAX_ENDERECOS);
   //   destino = getRandInt(r, 0, MAX_ENDERECOS);
-
   //   if (origem != destino)
   //   { // Verificação para evitar que seja realizada uma transação com origem e destino iguais
-
   //     // Endereço de origem
   //     unsigned int origemCarteira = origem;
   //     // Endereço de destino
@@ -351,13 +476,11 @@ void transacoes(MTRand *r, EnderecoAVL **end, BitCoinAVL **btc)
   // }
 }*/
 /*
+
 unsigned char *buscaHash(NoLista *raiz, unsigned int chave)
 {
-
   int naoAchou = 1;
-
   int numAtual = raiz->bM->bloco.numero;
-
   do
   {
     if (raiz == NULL)
@@ -369,7 +492,6 @@ unsigned char *buscaHash(NoLista *raiz, unsigned int chave)
       naoAchou = 0;
     raiz = raiz->prox;
   } while (naoAchou);
-
   return naoAchou ? NULL : raiz->bM->hash;
 }
 */
